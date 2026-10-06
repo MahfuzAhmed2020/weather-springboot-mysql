@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Weather Application</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+            color: #333;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1100px;
+            margin: 40px auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .search-box {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+
+        .search-box input {
+            flex: 1;
+            padding: 12px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+        }
+
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            background: #1976d2;
+            color: white;
+            font-size: 16px;
+        }
+
+        button:hover {
+            background: #125ca3;
+        }
+
+        .weather-card {
+            display: none;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+
+        .weather-card h2 {
+            margin-top: 0;
+        }
+
+        .weather-info {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .weather-item {
+            background: #f1f5f9;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .weather-item strong {
+            display: block;
+            font-size: 14px;
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        .weather-item span {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .history {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+
+        th,
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+            text-align: left;
+        }
+
+        th {
+            background: #f1f5f9;
+        }
+
+        .message {
+            margin-top: 15px;
+            color: #c62828;
+        }
+
+        @media (max-width: 700px) {
+            .search-box {
+                flex-direction: column;
+            }
+
+            .weather-info {
+                grid-template-columns: 1fr;
+            }
+
+            table {
+                font-size: 13px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Weather Application</h1>
+
+        <!-- Search -->
+        <div class="search-box">
+
+            <input type="text" id="cityInput" placeholder="Enter city name, e.g. Buffalo">
+
+            <button onclick="getWeather()">
+                Get Weather
+            </button>
+
+        </div>
+
+        <div id="message" class="message"></div>
+
+
+        <!-- Weather Result -->
+        <div id="weatherCard" class="weather-card">
+
+            <h2 id="cityName">Weather</h2>
+
+            <div class="weather-info">
+
+                <div class="weather-item">
+                    <strong>Temperature</strong>
+                    <span id="temperature">-</span>
+                </div>
+
+                <div class="weather-item">
+                    <strong>Feels Like</strong>
+                    <span id="feelsLike">-</span>
+                </div>
+
+                <div class="weather-item">
+                    <strong>Description</strong>
+                    <span id="description">-</span>
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- History -->
+        <div class="history">
+
+            <h2>Weather Search History</h2>
+
+            <button onclick="loadHistory()">
+                Refresh History
+            </button>
+
+            <table>
+
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>City</th>
+                        <th>Temperature</th>
+                        <th>Feels Like</th>
+                        <th>Description</th>
+                        <th>Searched At</th>
+                    </tr>
+                </thead>
+
+                <tbody id="historyTableBody">
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
+
+    <script>
+
+        const API_BASE_URL = "/api/weather";
+
+
+        // Get weather from Spring Boot
+        async function getWeather() {
+
+            const cityInput = document.getElementById("cityInput");
+
+            const city = cityInput.value.trim();
+
+            const message = document.getElementById("message");
+
+            const weatherCard = document.getElementById("weatherCard");
+
+
+            if (!city) {
+
+                message.textContent = "Please enter a city.";
+
+                weatherCard.style.display = "none";
+
+                return;
+            }
+
+
+            message.textContent = "Loading...";
+
+
+            try {
+
+                const response = await fetch(
+                    `${API_BASE_URL}?city=${encodeURIComponent(city)}`
+                );
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        `HTTP error: ${response.status}`
+                    );
+                }
+
+
+                const data = await response.json();
+
+
+                if (!data.current) {
+
+                    throw new Error(
+                        "Weather information was not returned."
+                    );
+                }
+
+
+                // Display city
+                document.getElementById("cityName").textContent =
+                    city;
+
+
+                // Display temperature
+                document.getElementById("temperature").textContent =
+                    `${data.current.temperature} °C`;
+
+
+                // Display feels like
+                document.getElementById("feelsLike").textContent =
+                    `${data.current.feelslike} °C`;
+
+
+                // Display description
+                let description = "N/A";
+
+
+                if (
+                    data.current.weather_descriptions &&
+                    data.current.weather_descriptions.length > 0
+                ) {
+
+                    description =
+                        data.current.weather_descriptions[0];
+                }
+
+
+                document.getElementById("description").textContent =
+                    description;
+
+
+                weatherCard.style.display = "block";
+
+                message.textContent = "";
+
+
+                // Refresh database history
+                loadHistory();
+
+            } catch (error) {
+
+                console.error(error);
+
+                message.textContent =
+                    "Unable to retrieve weather information.";
+
+                weatherCard.style.display = "none";
+            }
+        }
+
+
+        // Get history from MySQL through Spring Boot
+        async function loadHistory() {
+
+            const tableBody =
+                document.getElementById("historyTableBody");
+
+
+            tableBody.innerHTML =
+                "<tr><td colspan='6'>Loading...</td></tr>";
+
+
+            try {
+
+                const response =
+                    await fetch(`${API_BASE_URL}/history`);
+
+
+                if (!response.ok) {
+
+                    throw new Error(
+                        `HTTP error: ${response.status}`
+                    );
+                }
+
+
+                const history =
+                    await response.json();
+
+
+                tableBody.innerHTML = "";
+
+
+                if (history.length === 0) {
+
+                    tableBody.innerHTML =
+                        "<tr><td colspan='6'>No search history found.</td></tr>";
+
+                    return;
+                }
+
+
+                history.forEach(item => {
+
+                    const row =
+                        document.createElement("tr");
+
+
+                    row.innerHTML = `
+
+                    <td>${item.id}</td>
+
+                    <td>${item.city}</td>
+
+                    <td>${item.temperature ?? "-"}</td>
+
+                    <td>${item.feelsLike ?? "-"}</td>
+
+                    <td>${item.description ?? "-"}</td>
+
+                    <td>${item.searchedAt ?? "-"}</td>
+
+                `;
+
+
+                    tableBody.appendChild(row);
+
+                });
+
+            } catch (error) {
+
+                console.error(error);
+
+                tableBody.innerHTML =
+                    "<tr><td colspan='6'>Unable to load history.</td></tr>";
+            }
+        }
+
+
+        // Press Enter to search
+        document
+            .getElementById("cityInput")
+            .addEventListener("keydown", function (event) {
+
+                if (event.key === "Enter") {
+
+                    getWeather();
+
+                }
+
+            });
+
+
+        // Load history when page opens
+        loadHistory();
+
+    </script>
+
+</body>
+
+</html>

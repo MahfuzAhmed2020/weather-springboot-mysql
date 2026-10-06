@@ -1,0 +1,15 @@
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: weather-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: weatherdb
+    ports:
+      - "3306:3306"
+    volumes:
+      - weather_mysql_data:/var/lib/mysql
+
+volumes:
+  weather_mysql_data:
