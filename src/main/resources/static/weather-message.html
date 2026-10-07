@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Weather Message</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin-top: 80px;
+        }
+
+        input {
+            padding: 10px;
+            width: 220px;
+        }
+
+        button {
+            padding: 10px 15px;
+            cursor: pointer;
+        }
+
+        #message {
+            margin-top: 30px;
+            font-size: 22px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h2>Weather Search</h2>
+
+    <input type="text" id="cityInput" placeholder="Enter city: this data from the database" />
+
+    <button onclick="getWeatherMessage()">
+        Search
+    </button>
+
+    <div id="message"></div>
+
+    <br>
+
+    <a href="index.html">Home</a>
+    |
+    <a href="weather-message.html">Search Weather</a>
+
+
+    <script>
+
+        async function getWeatherMessage() {
+
+            const city =
+                document.getElementById("cityInput").value.trim();
+
+            const message =
+                document.getElementById("message");
+
+            if (!city) {
+                message.textContent = "Please enter a city.";
+                return;
+            }
+
+            try {
+
+                // Get weather history from Spring Boot
+                const response =
+                    await fetch("/api/weather/history");
+
+                const history =
+                    await response.json();
+
+                // Find city entered by user
+                const weather =
+                    history.find(
+                        item =>
+                            item.city.toLowerCase() === city.toLowerCase()
+                    );
+
+                if (!weather) {
+                    message.textContent =
+                        `No weather information found for ${city}.`;
+                    return;
+                }
+
+                // Display message
+                message.textContent =
+                    `Welcome to ${weather.city} and today's temperature is ${weather.temperature}°C and outside is ${weather.description}.`;
+
+            } catch (error) {
+
+                console.error(error);
+
+                message.textContent =
+                    "Unable to retrieve weather information.";
+            }
+        }
+
+    </script>
+
+</body>
+
+</html>

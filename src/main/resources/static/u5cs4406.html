@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Campus 3D – Polygonal meshes, curves, textures & transparency</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            pointer-events: none;
+            z-index: 100;
+            font-size: 14px;
+            backdrop-filter: blur(5px);
+        }
+
+        #screenshot-note {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.6);
+            color: #ccc;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 100;
+        }
+
+        .caption {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(30, 30, 30, 0.85);
+            color: #fff;
+            padding: 10px 18px;
+            border-radius: 8px;
+            font-size: 13px;
+            border-left: 4px solid #ffaa00;
+            z-index: 100;
+            max-width: 250px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="info">
+        <h2>🏛️ Smart Campus 3D Visualization</h2>
+        <p>Polygonal building | Bézier curved pathway | Textured & transparent materials</p>
+    </div>
+    <div id="screenshot-note">📸 MD MAHFUZ </div>
+    <div class="caption">
+        <strong>✨ Visual features:</strong><br>
+        • Building: low-poly mesh + brick texture<br>
+        • Pathway: quadratic Bézier curve (green)<br>
+        • Glass dome: transparent (opacity 0.45)<br>
+        • Surface normals: smooth shading on curves
+    </div>
+
+    <!-- Import Three.js and OrbitControls -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.128.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.128.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // --- 1. Setup scene, camera, renderer ---
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x112233); // deep blue-grey sky
+
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(12, 8, 18);
+        camera.lookAt(5, 2, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true; // for realism
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        renderer.setPixelRatio(window.devicePixelRatio);
+        document.body.appendChild(renderer.domElement);
+
+        // Controls
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+        controls.autoRotate = true;
+        controls.autoRotateSpeed = 0.8;
+        controls.target.set(5, 2, 0);
+        controls.enableZoom = true;
+
+        // --- 2. Lighting (to show normals & shading) ---
+        // Ambient light
+        const ambientLight = new THREE.AmbientLight(0x404060);
+        scene.add(ambientLight);
+
+        // Main directional light (simulating sun)
+        const dirLight = new THREE.DirectionalLight(0xfff5e6, 1.2);
+        dirLight.position.set(10, 20, 5);
+        dirLight.castShadow = true;
+        dirLight.receiveShadow = true;
+        dirLight.shadow.mapSize.width = 1024;
+        dirLight.shadow.mapSize.height = 1024;
+        const d = 25;
+        dirLight.shadow.camera.left = -d;
+        dirLight.shadow.camera.right = d;
+        dirLight.shadow.camera.top = d;
+        dirLight.shadow.camera.bottom = -d;
+        dirLight.shadow.camera.near = 1;
+        dirLight.shadow.camera.far = 50;
+        scene.add(dirLight);
+
+        // Fill light from behind
+        const backLight = new THREE.PointLight(0x4466ff, 0.4);
+        backLight.position.set(-5, 5, -10);
+        scene.add(backLight);
+
+        // A subtle rim light
+        const rimLight = new THREE.PointLight(0xffaa88, 0.5);
+        rimLight.position.set(-2, 3, 10);
+        scene.add(rimLight);
+
+        // --- 3. Ground plane (textured) ---
+        const groundGeometry = new THREE.CircleGeometry(30, 32);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2a4a2a,
+            roughness: 0.8,
+            metalness: 0.1,
+            side: THREE.DoubleSide
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        ground.position.y = -0.01;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        // Add some grid helper for scale
+        const gridHelper = new THREE.GridHelper(30, 20, 0x88aaff, 0x445577);
+        gridHelper.position.y = 0;
+        scene.add(gridHelper);
+
+        // --- 4. Task 1a: 3D building using polygonal mesh (low-poly with texture) ---
+        // Create a building base (box) + roof (pyramid) + windows (small boxes) to enhance mesh design
+        const buildingGroup = new THREE.Group();
+
+        // Load a brick texture (procedural via canvas to avoid external dependency)
+        function createBrickTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            // Background
+            ctx.fillStyle = '#b87c4b';
+            ctx.fillRect(0, 0, 512, 512);
+            // Draw bricks
+            ctx.fillStyle = '#8b5a2b';
+            const brickWidth = 100;
+            const brickHeight = 40;
+            const gap = 10;
+            for (let row = 0; row < 12; row++) {
+                for (let col = 0; col < 6; col++) {
+                    const x = col * (brickWidth + gap) + (row % 2 === 0 ? 0 : (brickWidth + gap) / 2);
+                    const y = row * (brickHeight + gap);
+                    ctx.fillStyle = row % 2 === 0 ? '#9c6b3a' : '#8b5a2b';
+                    ctx.fillRect(x, y, brickWidth, brickHeight);
+                    // Add slight highlight
+                    ctx.fillStyle = '#c28a5c';
+                    ctx.fillRect(x, y, brickWidth, 4);
+                }
+            }
+            // Add noise
+            for (let i = 0; i < 5000; i++) {
+                ctx.fillStyle = `rgba(0,0,0,${Math.random() * 0.1})`;
+                ctx.fillRect(Math.random() * 512, Math.random() * 512, 2, 2);
+            }
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.wrapS = THREE.RepeatWrapping;
+            texture.wrapT = THREE.RepeatWrapping;
+            texture.repeat.set(2, 2);
+            return texture;
+        }
+
+        const brickTexture = createBrickTexture();
+
+        // Main building body
+        const bodyGeo = new THREE.BoxGeometry(4, 5, 4);
+        const bodyMat = new THREE.MeshStandardMaterial({ map: brickTexture, roughness: 0.6, metalness: 0.1 });
+        const body = new THREE.Mesh(bodyGeo, bodyMat);
+        body.castShadow = true;
+        body.receiveShadow = true;
+        body.position.y = 2.5; // half height
+        buildingGroup.add(body);
+
+        // Roof (pyramid-like using ConeGeometry with 4 segments)
+        const roofGeo = new THREE.ConeGeometry(3, 2, 4);
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0xaa5533, roughness: 0.7 });
+        const roof = new THREE.Mesh(roofGeo, roofMat);
+        roof.castShadow = true;
+        roof.receiveShadow = true;
+        roof.position.y = 5 + 1; // body height 5 + half of roof height (1)
+        roof.rotation.y = Math.PI / 4; // align with box edges
+        buildingGroup.add(roof);
+
+        // Windows (small transparent boxes to show opacity effect)
+        const windowMat = new THREE.MeshStandardMaterial({
+            color: 0x88ccff,
+            emissive: 0x112233,
+            transparent: true,
+            opacity: 0.5,
+            roughness: 0.2,
+            metalness: 0.8
+        });
+        const windowGeo = new THREE.BoxGeometry(0.8, 1.0, 0.1);
+
+        // front windows
+        for (let i = -1; i <= 1; i += 2) {
+            for (let j = 0; j < 3; j++) {
+                const windowMesh = new THREE.Mesh(windowGeo, windowMat);
+                windowMesh.castShadow = true;
+                windowMesh.receiveShadow = true;
+                windowMesh.position.set(i * 1.2, 1.2 + j * 1.5, 2.01);
+                buildingGroup.add(windowMesh);
+            }
+        }
+        // side windows
+        for (let i = -1; i <= 1; i += 2) {
+            for (let j = 0; j < 3; j++) {
+                const windowMesh = new THREE.Mesh(windowGeo, windowMat);
+                windowMesh.castShadow = true;
+                windowMesh.receiveShadow = true;
+                windowMesh.position.set(2.01, 1.2 + j * 1.5, i * 1.2);
+                windowMesh.rotation.y = Math.PI / 2;
+                buildingGroup.add(windowMesh);
+            }
+        }
+
+        // Position the whole building
+        buildingGroup.position.set(3, 0, 1);
+        scene.add(buildingGroup);
+
+        // --- 5. Task 1b: Curved pathway using quadratic Bézier curve (TubeGeometry along curve) ---
+        // Also demonstrates smooth normals on curve-based structure.
+
+        // Define a quadratic Bézier curve for the pathway
+        const curve = new THREE.QuadraticBezierCurve3(
+            new THREE.Vector3(-5, 0.1, -3),   // start
+            new THREE.Vector3(2, 1.5, 6),     // control point (elevated for curve)
+            new THREE.Vector3(10, 0.1, 2)     // end
+        );
+
+        // Create a tube geometry along the curve to represent a walkway
+        const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.4, 8, false);
+        const tubeMat = new THREE.MeshStandardMaterial({
+            color: 0x6a9c78,
+            emissive: 0x1a3a1a,
+            roughness: 0.6,
+            metalness: 0.2,
+            side: THREE.DoubleSide // so we can see inside if camera goes through
+        });
+        const pathway = new THREE.Mesh(tubeGeo, tubeMat);
+        pathway.castShadow = true;
+        pathway.receiveShadow = true;
+        scene.add(pathway);
+
+        // Add glowing dashed line along the curve for extra visual (optional)
+        const points = curve.getPoints(50);
+        const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0xffdd44 });
+        const curveLine = new THREE.Line(lineGeo, lineMat);
+        scene.add(curveLine);
+
+        // Also add small spheres at control points to visualize Bézier
+        const sphereMat = new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0x442200 });
+        const sphereGeo = new THREE.SphereGeometry(0.15);
+        const p0 = new THREE.Mesh(sphereGeo, sphereMat); p0.position.copy(curve.v0); scene.add(p0);
+        const p1 = new THREE.Mesh(sphereGeo, sphereMat); p1.position.copy(curve.v1); scene.add(p1);
+        const p2 = new THREE.Mesh(sphereGeo, sphereMat); p2.position.copy(curve.v2); scene.add(p2);
+
+        // --- 6. Task 2: Additional texture and transparency examples ---
+
+        // 6a. A transparent glass dome on top of the building (sphere with transparency)
+        const domeGeo = new THREE.SphereGeometry(1.2, 32, 16);
+        const domeMat = new THREE.MeshStandardMaterial({
+            color: 0xaaccff,
+            transparent: true,
+            opacity: 0.35,
+            roughness: 0.1,
+            metalness: 0.3,
+            emissive: 0x112244
+        });
+        const dome = new THREE.Mesh(domeGeo, domeMat);
+        dome.castShadow = true;
+        dome.receiveShadow = true;
+        dome.position.set(3, 6.2, 1); // on top of building
+        scene.add(dome);
+
+        // 6b. A textured cube (different texture) as a kiosk / info point
+        function createGrassTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#3a7a3a';
+            ctx.fillRect(0, 0, 256, 256);
+            for (let i = 0; i < 2000; i++) {
+                ctx.fillStyle = `rgba(80, 140, 60, ${Math.random() * 0.8})`;
+                ctx.fillRect(Math.random() * 256, Math.random() * 256, 3, 3);
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+        const grassTex = createGrassTexture();
+
+        const kioskGeo = new THREE.BoxGeometry(1.5, 1.2, 1.5);
+        const kioskMat = new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.9 });
+        const kiosk = new THREE.Mesh(kioskGeo, kioskMat);
+        kiosk.castShadow = true;
+        kiosk.receiveShadow = true;
+        kiosk.position.set(-1, 0.6, 4);
+        scene.add(kiosk);
+
+        // Another transparent object: a glass sphere floating as decoration
+        const glassSphereGeo = new THREE.SphereGeometry(0.8, 32, 16);
+        const glassSphereMat = new THREE.MeshStandardMaterial({
+            color: 0x88ddff,
+            transparent: true,
+            opacity: 0.25,
+            roughness: 0.05,
+            metalness: 0.9,
+            emissive: 0x002244
+        });
+        const glassSphere = new THREE.Mesh(glassSphereGeo, glassSphereMat);
+        glassSphere.castShadow = true;
+        glassSphere.receiveShadow = true;
+        glassSphere.position.set(-2, 1.5, -1);
+        scene.add(glassSphere);
+
+        // --- 7. Task 1c / 3: Demonstrate smoothness & normals: Add a high-poly smooth sphere vs low-poly sphere for comparison ---
+        // This helps visualize surface smoothness differences.
+
+        // Low-poly sphere (flat shading) - to show faceted normals
+        const lowPolySphereGeo = new THREE.SphereGeometry(1, 8, 6);
+        const lowPolyMat = new THREE.MeshStandardMaterial({ color: 0xffaa66, roughness: 0.5, flatShading: true });
+        const lowPolySphere = new THREE.Mesh(lowPolySphereGeo, lowPolyMat);
+        lowPolySphere.castShadow = true;
+        lowPolySphere.receiveShadow = true;
+        lowPolySphere.position.set(-3, 1, 7);
+        scene.add(lowPolySphere);
+
+        // High-poly sphere (smooth shading) - shows smooth normals
+        const highPolySphereGeo = new THREE.SphereGeometry(1, 32, 24);
+        const highPolyMat = new THREE.MeshStandardMaterial({ color: 0x66aaff, roughness: 0.3, metalness: 0.2 });
+        const highPolySphere = new THREE.Mesh(highPolySphereGeo, highPolyMat);
+        highPolySphere.castShadow = true;
+        highPolySphere.receiveShadow = true;
+        highPolySphere.position.set(1, 1, 7);
+        scene.add(highPolySphere);
+
+        // Add small labels via floating dots (optional)
+        // Using simple sprites to indicate low/high poly
+        function createLabel(text, color) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128;
+            canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'rgba(0,0,0,0.7)';
+            ctx.fillRect(0, 0, 128, 64);
+            ctx.fillStyle = color;
+            ctx.font = 'Bold 20px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(text, 64, 40);
+            const texture = new THREE.CanvasTexture(canvas);
+            const material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+            const sprite = new THREE.Sprite(material);
+            sprite.scale.set(1.5, 0.75, 1);
+            return sprite;
+        }
+
+        const lowLabel = createLabel('LOW POLY', '#ffaa66');
+        lowLabel.position.set(-3, 2.5, 7);
+        scene.add(lowLabel);
+
+        const highLabel = createLabel('HIGH POLY', '#66aaff');
+        highLabel.position.set(1, 2.5, 7);
+        scene.add(highLabel);
+
+        // --- 8. Add some trees / decorative low-poly objects to enrich the campus ---
+        function createTree(x, z) {
+            const treeGroup = new THREE.Group();
+            // trunk
+            const trunkGeo = new THREE.CylinderGeometry(0.2, 0.25, 1.5);
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b });
+            const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+            trunk.castShadow = true;
+            trunk.receiveShadow = true;
+            trunk.position.y = 0.75;
+            treeGroup.add(trunk);
+            // foliage (low-poly cones)
+            const foliageMat = new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 0.6 });
+            const foliage1 = new THREE.Mesh(new THREE.ConeGeometry(0.8, 1.2, 6), foliageMat);
+            foliage1.castShadow = true;
+            foliage1.receiveShadow = true;
+            foliage1.position.y = 1.5;
+            treeGroup.add(foliage1);
+            const foliage2 = new THREE.Mesh(new THREE.ConeGeometry(0.6, 1.0, 6), foliageMat);
+            foliage2.castShadow = true;
+            foliage2.receiveShadow = true;
+            foliage2.position.y = 2.2;
+            treeGroup.add(foliage2);
+
+            treeGroup.position.set(x, 0, z);
+            return treeGroup;
+        }
+
+        scene.add(createTree(-4, 0));
+        scene.add(createTree(8, -2));
+        scene.add(createTree(9, 5));
+        scene.add(createTree(-2, -5));
+        scene.add(createTree(5, -4));
+
+        // --- 9. Animation loop ---
+        let clock = new THREE.Clock();
+
+        function animate() {
+            const delta = clock.getDelta();
+            const elapsedTime = performance.now() / 1000;
+
+            // Subtle floating animation for glass sphere (shows transparency dynamically)
+            glassSphere.position.y = 1.5 + Math.sin(elapsedTime * 1.5) * 0.15;
+            // Rotate the low-poly sphere to show facets
+            lowPolySphere.rotation.y += 0.005;
+            lowPolySphere.rotation.x += 0.002;
+            // Rotate high-poly sphere slowly
+            highPolySphere.rotation.y += 0.003;
+
+            // Auto-rotate controls
+            controls.update();
+
+            renderer.render(scene, camera);
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // --- 10. Handle window resize ---
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        // --- 11. Brief note about screenshots: we've already added caption ---
+        console.log('Smart Campus 3D ready – use screenshots for assignment tasks.');
+    </script>
+</body>
+
+</html>
