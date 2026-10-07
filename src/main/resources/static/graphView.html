@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Temperature Dashboard</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f7fb;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 50px auto;
+        }
+
+        h1 {
+            text-align: center;
+        }
+
+        .chart-box {
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #message {
+            text-align: center;
+            margin: 20px;
+        }
+    </style>
+
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>Temperature by City</h1>
+
+        <div id="message">
+            Loading temperature data...
+        </div>
+
+        <div class="chart-box">
+
+            <canvas id="temperatureChart"></canvas>
+
+        </div>
+
+    </div>
+
+    <br>
+
+    <a href="index.html">Home</a>
+    |
+    <a href="weather-message.html">Search Weather</a>
+    |
+    <a href="graphView.html">View Graph</a>
+
+    <script>
+
+        async function loadTemperature() {
+
+            try {
+
+                // Get data from Spring Boot
+                const response =
+                    await fetch("/api/weather/history");
+
+                if (!response.ok) {
+                    throw new Error("Unable to load weather data");
+                }
+
+                const history =
+                    await response.json();
+
+                // Store latest record for each city
+                const latestCities = {};
+
+                history.forEach(item => {
+
+                    const city =
+                        item.city.toLowerCase();
+
+                    if (
+                        !latestCities[city] ||
+                        new Date(item.searchedAt) >
+                        new Date(latestCities[city].searchedAt)
+                    ) {
+                        latestCities[city] = item;
+                    }
+
+                });
+
+                // Convert object to array
+                const weatherData =
+                    Object.values(latestCities);
+
+                // City names
+                const cities =
+                    weatherData.map(item => item.city);
+
+                // Temperatures
+                const temperatures =
+                    weatherData.map(item => item.temperature);
+
+                document.getElementById("message").textContent =
+                    `${weatherData.length} cities found`;
+
+                // Create chart
+                new Chart(
+                    document.getElementById("temperatureChart"),
+                    {
+                        type: "bar",
+
+                        data: {
+                            labels: cities,
+
+                            datasets: [
+                                {
+                                    label: "Temperature (°C)",
+                                    data: temperatures
+                                }
+                            ]
+                        },
+
+                        options: {
+
+                            responsive: true,
+
+                            plugins: {
+                                legend: {
+                                    display: true
+                                }
+                            },
+
+                            scales: {
+
+                                y: {
+                                    beginAtZero: true,
+
+                                    title: {
+                                        display: true,
+                                        text: "Temperature (°C)"
+                                    }
+                                },
+
+                                x: {
+                                    title: {
+                                        display: true,
+                                        text: "Cities"
+                                    }
+                                }
+
+                            }
+
+                        }
+                    }
+                );
+
+            } catch (error) {
+
+                console.error(error);
+
+                document.getElementById("message").textContent =
+                    "Unable to load temperature data.";
+
+            }
+
+        }
+
+        loadTemperature();
+
+    </script>
+
+</body>
+
+</html>
